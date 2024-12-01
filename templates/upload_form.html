@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookstore Scheduling - File Upload</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h2, h3 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .form-section label {
+            font-size: 1rem;
+            color: #555;
+        }
+
+        .form-section input[type="file"],
+        .form-section input[type="date"] {
+            font-size: 0.95rem;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .form-section input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .form-section button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            text-align: center;
+        }
+
+        .form-section button:hover {
+            background-color: #0056b3;
+        }
+
+        .section-divider {
+            border-top: 1px solid #ddd;
+            margin: 30px 0;
+        }
+
+        .date-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .date-section label {
+            font-size: 1rem;
+            color: #555;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .date-section input {
+            font-size: 0.95rem;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 60%;
+            max-width: 300px;
+            margin: 0 auto;
+            box-sizing: border-box;
+            display: block;
+        }
+
+        .date-section button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 15px;
+        }
+
+        .date-section button:hover {
+            background-color: #218838;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        .footer p {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Bookstore Scheduling - File Upload</h2>
+
+        <!-- File Upload Form -->
+        <form action="/upload-files" method="POST" enctype="multipart/form-data">
+            <div class="form-section">
+                <label for="employee_availability">Employee Availability Files:</label>
+                <input type="file" name="daily_employee_files" id="employee_availability" multiple required>
+            </div>
+
+            <div class="form-section">
+                <label for="shift_requirements">Shift Requirement Files:</label>
+                <input type="file" name="daily_shift_files" id="shift_requirements" multiple required>
+            </div>
+
+            <div class="form-section">
+                <label for="shift_date">Shift Date:</label>
+                <input type="date" name="shift_date" id="shift_date" required>
+            </div>
+
+            <div class="form-section">
+                <button type="submit">Upload Files</button>
+            </div>
+        </form>
+
+        <div class="section-divider"></div>
+
+        <!-- Retrieve Files Section -->
+        <div class="date-section">
+            <h3>Retrieve Files by Date</h3>
+            <form action="/retrieve-files" method="POST">
+                <label for="date_selection">Select Date:</label>
+                <input type="date" name="date" id="date_selection" required>
+                <button type="submit">Retrieve Files</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>&copy; 2024 Bookstore Scheduling. </p>
+    </div>
+</body>
+</html>
