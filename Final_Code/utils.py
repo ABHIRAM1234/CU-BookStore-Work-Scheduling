@@ -2,7 +2,8 @@
 import pandas as pd
 from datetime import datetime, timedelta, time
 
-# Collect today's date
+# Define Global Variables
+time_interval=30
 today_date = datetime.today().date()
 
 def transform_time_inout(df):
@@ -97,7 +98,7 @@ def create_working_flag(filtered_df):
 
     return work_status_df
 
-def create_remaining_hours(work_status_df):
+def create_remaining_hours(work_status_df, filtered_df):
     # Caluculate remaining hours left 
     greeter_priority_df= work_status_df.copy()
     work_status_copy_df= work_status_df.copy()
@@ -155,6 +156,7 @@ def create_remaining_hours(work_status_df):
     return greeter_priority_df
 
 def alert_employee_shortage(work_status_df, emp_count_req):
+
     emp_aval= work_status_df.copy()
     emp_aval.rename(columns={'Start_time': 'Work_From', 'End_time': 'Work_To', 'Working Flag': 'Working_Flag'}, inplace=True)
 
@@ -182,3 +184,4 @@ def alert_employee_shortage(work_status_df, emp_count_req):
 
     emp_demand_check['Availability_Check_Flag']= emp_demand_check['Min_Total_Emp_Needed']<= emp_demand_check['Total_Avl_Emp']
     alert_insufficient_emp(emp_demand_check)
+    return emp_demand_check

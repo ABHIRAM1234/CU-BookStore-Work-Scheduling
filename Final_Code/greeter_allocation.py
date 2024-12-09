@@ -1,14 +1,14 @@
 
 
-def assign_priority(df, filtered_df, greeter_shift_done_dict):
+def assign_priority(df, greeter_shift_done_dict):
     # Initialize the priority column
     df['Priority'] = 0  # Initialize the Priority column with zeros
     
     # Group by Start_time and End_time
     for (start, end), group in df.groupby(['Start_time', 'End_time']):
-        responsible_people = filtered_df[(filtered_df['Time in'] == start) & 
-                                         (filtered_df['Time out'] == end) & 
-                                         (filtered_df['Responsibility'] == 'Greeter')]
+        responsible_people = df[(df['Time in'] == start) & 
+                                         (df['Time out'] == end) & 
+                                         (df['Responsibility'] == 'Greeter')]
         
         if not responsible_people.empty:
             for index, row in responsible_people.iterrows():
@@ -43,16 +43,17 @@ def assign_priority(df, filtered_df, greeter_shift_done_dict):
 
     return df  # Return the modified DataFrame with the Priority column
 
-def allocate_greeter(greeter_priority_df, filtered_df):
+def allocate_greeter(greeter_priority_df, emp_requirements):
 
     # Create greeter shift completed dictionary
-    unique_names = filtered_df['Name'].unique()
+    unique_names = greeter_priority_df['Name'].unique()
     greeter_shift_done_dict = {name: 0 for name in unique_names} # Create a dictionary with names as keys and 0 as the initial value
     
     # Assign priorities before processing time periods
-    greeter_priority_df = assign_priority(greeter_priority_df, filtered_df, greeter_shift_done_dict)
+    greeter_priority_df = assign_priority(greeter_priority_df, greeter_shift_done_dict)
 
-    greeter_assignment=greeter_priority_df[['From_Time','To_Time','Greeter_Down_Needed','Greeter_Up_Needed']]
+    # Collected required # greeters
+    greeter_assignment=emp_requirements[['From_Time','To_Time','Greeter_Down_Needed','Greeter_Up_Needed']]
     time_periods = greeter_assignment.drop_duplicates()
 
     for idx, period in time_periods.iterrows():
