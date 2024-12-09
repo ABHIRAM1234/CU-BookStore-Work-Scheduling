@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, render_template
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+import pandas as pd
 
 # Load environment variables from .env file
 load_dotenv()
@@ -74,10 +75,26 @@ def upload_files():
         s3_file_name = os.path.join(S3_FOLDER, folder, f"{formatted_date}_{file.filename}")
 
         try:
-            # Upload file to S3
-            s3_client.upload_fileobj(file, S3_BUCKET_NAME, s3_file_name)
-            print(f"File {file.filename} uploaded successfully to S3 at {s3_file_name}.")
-            
+            # Convert the file to CSV if it is an .xlsx file
+            if file.filename.endswith('.xlsx'):
+                # Read the Excel file into a DataFrame
+                df = pd.read_excel(file)
+                
+                # Create a temporary CSV file
+                csv_file_name = f"/tmp/{formatted_date}_{os.path.splitext(file.filename)[0]}.csv"
+                df.to_csv(csv_file_name, index=False)
+
+                # Upload the CSV file to S3
+                with open(csv_file_name, 'rb') as csv_file:
+                    s3_client.upload_fileobj(csv_file, S3_BUCKET_NAME, s3_file_name.replace('.xlsx', '.csv'))
+
+                print(f"File {file.filename} converted to CSV and uploaded successfully to S3 at {s3_file_name.replace('.xlsx', '.csv')}.")
+                os.remove(csv_file_name)  # Clean up temporary file
+            else:
+                # Upload the original file to S3
+                s3_client.upload_fileobj(file, S3_BUCKET_NAME, s3_file_name)
+                print(f"File {file.filename} uploaded successfully to S3 at {s3_file_name}.")
+
             # Store the filename in the dictionary to simulate storage
             if file in daily_employee_files:
                 uploaded_files['daily_employee_files'].append(s3_file_name)
@@ -89,6 +106,7 @@ def upload_files():
 
     # Return success message once both file sets are uploaded
     return jsonify({"message": f"{len(daily_employee_files)} Daily Employee Availability files and {len(daily_shift_files)} Daily Shift Requirements files uploaded successfully to S3!"}), 200
+
 
 # Route to check if files have been uploaded
 @app.route('/retrieve-files', methods=['POST'])
