@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 from utils import transform_time_inout, create_working_flag, create_remaining_hours, alert_employee_shortage 
 import pandas as pd
 import io
+from sqlalchemy import create_engine
 
 
 @task()
@@ -94,37 +95,78 @@ def prepare_shift_req(work_status_df, emp_count_req):
 
 @task()
 def store_work_status_in_rds(work_status_df):
-    # Define the RDS connection string
-    connection_string = "postgresql+psycopg2://<username>:<password>@<host>:<port>/<database>"
-    
-    # Create a SQLAlchemy engine
-    engine = create_engine(connection_string)
-    
-    # Store the DataFrame in the RDS database
-    with engine.connect() as connection:
-        work_status_df.to_sql(
-            name='work_status',  # Replace with your table name
-            con=connection,
-            if_exists='replace',  # Use 'append' to add rows instead of replacing
-            index=False
-        )
+    print("INPUT DATA.")
+    print("Data:")
+    print(work_status_df.head())
+    print("Data Info:")
+    print(work_status_df.info())
+
+    # 1. Format datatype and convert the dataframe into list of tuple
+    work_status_df["Start_time"] = work_status_df["Start_time"].astype(str)
+    work_status_df["End_time"] = work_status_df["End_time"].astype(str)
+
+    insert_values= [] # Will be a list of tuples
+    for index,row in work_status_df.iterrows():
+        insert_values.append(tuple(row.values))
+    print("Dataformatted successfully.")
+    print("Data:")
+    print(work_status_df.head())
+    print("Data Info:")
+    print(work_status_df.info())
+
+    # 2. Create database connection
+    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    engine = create_engine(db_url)
+    print("Database connection successfully.")
+
+    # 3. Truuncate the table and insert new data row by row
+    truncate_query= "TRUNCATE TABLE transformed.work_status; "
+    insert_query= "INSERT INTO transformed.work_status  VALUES (%s, %s, %s, %s, %s)"
+    with engine.connect() as conn:
+        conn.execute(truncate_query) 
+        for record in insert_values:
+            conn.execute(insert_query, record)
+    print("Data replaced/inserted successfully.")
+
+    return
 
 @task()
 def store_emp_requirements_in_rds(emp_requirements):
-    # Define the RDS connection string
-    connection_string = "postgresql+psycopg2://<username>:<password>@<host>:<port>/<database>"
-    
-    # Create a SQLAlchemy engine
-    engine = create_engine(connection_string)
-    
-    # Store the DataFrame in the RDS database
-    with engine.connect() as connection:
-        emp_requirements.to_sql(
-            name='employee_requirements',  # Replace with your table name
-            con=connection,
-            if_exists='replace',  # Use 'append' to add rows instead of replacing
-            index=False
-        )
+
+    print("INPUT DATA.")
+    print("Data:")
+    print(emp_requirements.head())
+    print("Data Info:")
+    print(emp_requirements.info())
+
+    # 1. Format datatype and convert the dataframe into list of tuple
+    emp_requirements["From_Time"] = emp_requirements["From_Time"].astype(str)
+    emp_requirements["To_Time"] = emp_requirements["To_Time"].astype(str)
+
+    insert_values= [] # Will be a list of tuples
+    for index,row in emp_requirements.iterrows():
+        insert_values.append(tuple(row.values))
+    print("Dataformatted successfully.")
+    print("Data:")
+    print(emp_requirements.head())
+    print("Data Info:")
+    print(emp_requirements.info())
+
+    # 2. Create database connection
+    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    engine = create_engine(db_url)
+    print("Database connection successfully.")
+
+    # 3. Truuncate the table and insert new data row by row
+    truncate_query= "TRUNCATE TABLE transformed.emp_req; "
+    insert_query= "INSERT INTO transformed.emp_req  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    with engine.connect() as conn:
+        conn.execute(truncate_query) 
+        for record in insert_values:
+            conn.execute(insert_query, record)
+    print("Data replaced/inserted successfully.")
+
+    return
 
 with DAG(dag_id="Bookstore_Scheduling_DAG", schedule_interval="0 9 * * *", start_date=datetime(2022, 3, 5), catchup=False, tags=["Bookstore"]) as dag:
 
