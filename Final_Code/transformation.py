@@ -38,3 +38,9 @@ print('emp_requirements')
 print(emp_requirements.head()) # Formally emp_demand_check
 
 
+work_status_df.to_csv(r'C:\Users\niran\OneDrive - UCB-O365\01. Study\00. Revision & Self Study\01. Portfolio Projects\04. CU BookStore Scheduling\CU-BookStore-Work-Scheduling\Final_Code\test\work_status_df.csv', index= False)
+emp_requirements.to_csv(r'C:\Users\niran\OneDrive - UCB-O365\01. Study\00. Revision & Self Study\01. Portfolio Projects\04. CU BookStore Scheduling\CU-BookStore-Work-Scheduling\Final_Code\test\emp_requirements.csv', index= False)
+print("Files Saved")
+
+
+

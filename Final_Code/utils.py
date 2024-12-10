@@ -10,8 +10,16 @@ def transform_time_inout(df):
     '''
     This function adds date to time columns and adjust the 15mins interval end/start shifts to 30-mins interval'''
     # Convert 'Time in' and 'Time out' to datetime with today's date
-    df['Time in'] = pd.to_datetime(df['Time in'], format='%I:%M:%S %p').apply(lambda x: datetime.combine(today_date, x.time()))
-    df['Time out'] = pd.to_datetime(df['Time out'], format='%I:%M:%S %p').apply(lambda x: datetime.combine(today_date, x.time()))
+    print("\n\n df.head()")
+    print(df.head())
+    print("Columns:")
+    print(df.columns)
+    print("First Row:")
+    print(df.iloc[0,])
+    print("Second Row:")
+    print(df.iloc[1,])
+    df['Time in'] = pd.to_datetime(df['Time in'], format='%Y-%m-%d %H:%M:%S').apply(lambda x: datetime.combine(today_date, x.time()))
+    df['Time out'] = pd.to_datetime(df['Time out'], format='%Y-%m-%d %H:%M:%S').apply(lambda x: datetime.combine(today_date, x.time()))
 
     # Note: If the initial shift allocation starts (Time In) at any 15mins interval (like 8:45), we are shifting to later 30mins (9:00) AND if the initial shift allocation ends (Time Out) at any 15mins interval (like 6:15), we are shifting to previous 30mins (6:00). 
     # Function to adjust times based on 15-minute intervals

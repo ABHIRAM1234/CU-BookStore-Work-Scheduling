@@ -134,4 +134,4 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
         #break
         curr_time= curr_time_plus30
 
-    register_allocation
+    return register_allocation

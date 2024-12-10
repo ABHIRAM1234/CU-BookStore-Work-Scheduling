@@ -6,9 +6,9 @@ def assign_priority(df, greeter_shift_done_dict):
     
     # Group by Start_time and End_time
     for (start, end), group in df.groupby(['Start_time', 'End_time']):
-        responsible_people = df[(df['Time in'] == start) & 
-                                         (df['Time out'] == end) & 
-                                         (df['Responsibility'] == 'Greeter')]
+        responsible_people = df[(df['Start_time'] == start) & 
+                                         (df['End_time'] == end)]# & 
+                                         #(df['Responsibility'] == 'Greeter')]
         
         if not responsible_people.empty:
             for index, row in responsible_people.iterrows():
