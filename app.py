@@ -1,9 +1,11 @@
 import boto3
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_file
 import os
 from dotenv import load_dotenv
 from datetime import datetime
 import pandas as pd
+from sqlalchemy import create_engine
+from io import BytesIO
 
 # Load environment variables from .env file
 load_dotenv()
@@ -11,6 +13,11 @@ load_dotenv()
 # Access AWS credentials and region
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+# Database connection
+DB_URL = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+engine = create_engine(DB_URL)
+print("RDS DATABSE ENGINE CONNECTED")
 
 app = Flask(__name__)
 
@@ -108,18 +115,59 @@ def upload_files():
     return jsonify({"message": f"{len(daily_employee_files)} Daily Employee Availability files and {len(daily_shift_files)} Daily Shift Requirements files uploaded successfully to S3!"}), 200
 
 
-# Route to check if files have been uploaded
 @app.route('/retrieve-files', methods=['POST'])
 def retrieve_files():
-    # Check if both file sets are uploaded and stored in the dictionary
-    if ('daily_employee_files' in uploaded_files and
-        'daily_shift_files' in uploaded_files and
-        uploaded_files['daily_employee_files'] and uploaded_files['daily_shift_files']):
-        return jsonify({"status": True, "message": "Files are available for processing."}), 200
-    else:
-        return jsonify({"status": False, "message": "Files are missing."}), 400
+    # Get the date from the form
+    selected_date = request.form.get('date')
 
+    # Validate the date
+    if not selected_date:
+        return jsonify({"error": "Date is required."}), 400
+
+    try:
+        # Query the database
+        query = "SELECT * FROM scheduled.final_allocation"
+        with engine.connect() as conn:
+            sql_query = pd.read_sql(
+                sql=query,
+                con=conn.connection
+            )
+        df = pd.DataFrame(sql_query)
+        # Convert the DataFrame to HTML for rendering
+        table_html = df.to_html(classes='table table-bordered', index=False)
+        return render_template('retrieve_results.html', table_html=table_html)
+
+    except Exception as e:
+        return render_template('error.html', error_message=str(e))
+
+# Route to download Excel
+@app.route('/download-excel')
+def download_excel():
+    try:
+        # Query the database
+        query = "SELECT * FROM scheduled.final_allocation"
+        with engine.connect() as conn:
+            sql_query = pd.read_sql(
+                sql=query,
+                con=conn.connection
+            )
+        df = pd.DataFrame(sql_query)
+
+        # Create an Excel file
+        output = BytesIO()
+        df.to_excel(output, index=False, engine='openpyxl')
+        output.seek(0)
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='schedule.xlsx'
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
 
 
