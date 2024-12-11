@@ -1,8 +1,16 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
+import boto3
+import json
+import os
+import uuid
+import json
+from dotenv import load_dotenv
 
-def convert_scheduled_data_to_json():
+load_dotenv()
+
+def covert_rds_to_json():
     # 1. Create database connection
     db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
     engine = create_engine(db_url)
@@ -137,9 +145,184 @@ def convert_scheduled_data_to_json():
     for key,value in dynamo_db_input.items():
         dynamo_db_input_records.append(value)
 
-    print("Data Conversion Successfull")
+    print("Data Conversion Successfull \n\n")
 
     return dynamo_db_input_records
 
+def upload_data_to_dynamodb(records):
 
-print(convert_scheduled_data_to_json())
+    # Get AWS credentials from environment variables
+    region = os.getenv('AWS_DEFAULT_REGION', 'ap-south-1')
+    aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+    # Initialize DynamoDB client and table with credentials
+    dynamodb = boto3.resource(
+        'dynamodb',
+        region_name=region,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key
+    )
+    table = dynamodb.Table('ShiftsTable')
+
+    # Upload each record one at a time
+    for record in records:
+        #formatted_item = format_item_for_dynamodb(record)
+        formatted_item= record
+        table.put_item(Item=formatted_item)
+        print(f"Item uploaded successfully: {formatted_item}")
+
+    return
+
+def connect_to_dynamodb():
+    dynamodb = boto3.resource(
+        'dynamodb',
+        region_name=os.getenv('AWS_DEFAULT_REGION', 'ap-south-1'),
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+    )
+    table = dynamodb.Table('ShiftsTable')
+    return table
+
+def connect_to_sqs():
+    try:
+        sqs = boto3.client('sqs',
+                region_name=os.getenv('AWS_DEFAULT_REGION', 'ap-south-1'),
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'))
+
+        queue_url = 'https://sqs.ap-south-1.amazonaws.com/339713126144/schedule_email_sqs.fifo'
+        return sqs, queue_url
+    except Exception as e:
+        print(f"Error connecting to SQS: {e}")
+        return None, None
+     
+def send_data_to_sqs():
+    def get_items_from_dynamodb(table):
+        try:
+            # Scan all items from the table
+            response = table.scan()
+            items = response.get('Items', [])
+            
+            # Paginate as there are more items
+            while 'LastEvaluatedKey' in response:
+                response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+                items.extend(response.get('Items', []))
+            
+            return items
+        
+        except Exception as e:
+            print(f"Error retrieving data from DynamoDB: {e}")
+            return []
+    
+    def send_to_sqs(items, sqs, queue_url):
+        """Send each item to the SQS queue."""
+        try:
+            for item in items:
+                # Send message to SQS
+                response = sqs.send_message(
+                    QueueUrl=queue_url,
+                    MessageBody=json.dumps(item),
+                    MessageGroupId="schedule_group",  
+                    MessageDeduplicationId=str(uuid.uuid4())  
+                )
+                print(f"Message sent with ID: {response['MessageId']}")
+        
+        except Exception as e:
+            print(f"Error sending message to SQS: {e}")
+    
+    table = connect_to_dynamodb()
+    if table:
+        sqs, queue_url = connect_to_sqs()
+        
+        if sqs and queue_url:
+            items = get_items_from_dynamodb(table)
+            
+            if items:
+                send_to_sqs(items, sqs, queue_url)
+            else:
+                print("No items to send.")
+        else:
+            print("Failed to connect to SQS.")
+    else:
+        print("Failed to connect to DynamoDB.")
+
+    pass
+
+def connect_to_ses():
+    try:
+        ses = boto3.client('ses',
+                region_name=os.getenv('AWS_DEFAULT_REGION', 'ap-south-1'),
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'))
+        return ses
+    except Exception as e:
+        print(f"Error connecting to SES: {e}")
+        return None
+    
+def process_sqs_messages():
+    def send_email_via_ses(item, ses):
+        try:
+            name = item['Name']
+            email = item['Email']
+            shift_details = item['Data']
+            
+            body = f"Hi {name},\n\nHere are your shift details:\n"
+            for shift in shift_details:
+                body += f"- {shift['TimeIn']} to {shift['TimeOut']} at {shift['Location']}\n"
+            
+            # Send email via SES
+            ses.send_email(
+                Source='saaijeesh23@gmail.com',  
+                Destination={'ToAddresses': [email]},
+                Message={
+                    'Subject': {'Data': 'Your Shift Details'},
+                    'Body': {'Text': {'Data': body}}
+                }
+            )
+            print(f"Email sent to {name} at {email}")
+        except Exception as e:
+            print(f"Error sending email via SES: {e}")
+
+    sqs, queue_url = connect_to_sqs()
+
+    # Send emails for a batch of 10 at a time
+    if sqs:
+        response = sqs.receive_message(
+            QueueUrl=queue_url,
+            MaxNumberOfMessages=10,  
+            WaitTimeSeconds=10
+        )
+
+        while 'Messages' in response:
+            ses = connect_to_ses()
+            if ses:
+                for message in response['Messages']:
+                    #print("Message Body:", message['Body'])
+
+                    try:
+                        item = json.loads(message['Body'])
+                        send_email_via_ses(item, ses)
+
+                        # Delete the processed message from SQS
+                        sqs.delete_message(
+                            QueueUrl=queue_url,
+                            ReceiptHandle=message['ReceiptHandle']
+                        )
+                        print(f"Message deleted from SQS: {message['MessageId']}")
+
+                    except Exception as e:
+                        print(f"Error processing message: {e}")
+            print("\n\n Emails Sent For Batch\n\n")
+            response = sqs.receive_message(
+                QueueUrl=queue_url,
+                MaxNumberOfMessages=10,  
+                WaitTimeSeconds=10
+            )
+    else:
+        print("Failed to connect to SQS.")
+    return
+
+
+
+

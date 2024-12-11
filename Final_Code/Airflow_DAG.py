@@ -14,7 +14,7 @@ import io
 from sqlalchemy import create_engine
 from greeter_allocation import allocate_greeter
 from register_salesfloor_acclocation import allocate_register_salesfloor
-
+from email_scripts import covert_rds_to_json,  upload_data_to_dynamodb, send_data_to_sqs, process_sqs_messages
 
 ############## Transformation Functions ##############
 @task()
@@ -300,6 +300,27 @@ def store_final_allocation_in_rds(final_allocation):
 
     return
 
+############## Emailing Functions ##############
+@task()
+def convert_scheduled_data_to_json():
+    records= covert_rds_to_json()
+    return records
+
+@task()
+def upload_json_to_dynamo(records):
+    upload_data_to_dynamodb(records)
+    return
+
+@task()
+def migrate_dynamo_to_sqs():
+    send_data_to_sqs()
+    return
+
+@task()
+def email_with_ses_from_sqs():
+    process_sqs_messages()
+    return
+
 with DAG(dag_id="Bookstore_Scheduling_DAG", schedule_interval="0 9 * * *", start_date=datetime(2022, 3, 5), catchup=False, tags=["Bookstore"]) as dag:
 
     with TaskGroup("Transformation_ETL", tooltip="Extract & transform Employee Availability and Shift Requirement data") as transformation:
@@ -330,5 +351,14 @@ with DAG(dag_id="Bookstore_Scheduling_DAG", schedule_interval="0 9 * * *", start
         # Define the task order using task objects
         [work_status_df_task, emp_requirements_task] >> greeter_assignment_task >> final_allocation_task >> store_final_allocation_rds_task
 
-    transformation >> scheduling
+    with TaskGroup("Emailing", tooltip="Convert RDS to JSON, Stores them to Dynamo DB, Uploads to SQS and Emails employee's.") as emailing:
+        rds_to_json = convert_scheduled_data_to_json()
+        json_to_dynamo = upload_json_to_dynamo(rds_to_json)
+        dynamo_to_sqs= migrate_dynamo_to_sqs()
+        sqs_to_email= email_with_ses_from_sqs() # Sends email only if email ID is available
+
+        # Define the task order using task objects
+        rds_to_json >> json_to_dynamo >> dynamo_to_sqs >> sqs_to_email
+
+    transformation >> scheduling >> emailing
 
