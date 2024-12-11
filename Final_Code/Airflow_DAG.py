@@ -12,8 +12,11 @@ from utils import transform_time_inout, create_working_flag, create_remaining_ho
 import pandas as pd
 import io
 from sqlalchemy import create_engine
+from greeter_allocation import allocate_greeter
+from register_salesfloor_acclocation import allocate_register_salesfloor
 
 
+############## Transformation Functions ##############
 @task()
 def fetch_emp_avail_from_s3():
     # Initialize S3Hook with the default AWS connection
@@ -165,12 +168,141 @@ def store_emp_requirements_in_rds(emp_requirements):
         for record in insert_values:
             conn.execute(insert_query, record)
     print("Data replaced/inserted successfully.")
+    return
+
+
+############## Scheduling Functions ##############
+@task()
+def fetch_work_status_df_transformed_from_RDS():
+    
+    # 1. Create database connection
+    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    engine = create_engine(db_url)
+
+    # 2. Query data from DB
+    query= 'SELECT * FROM transformed.work_status;'
+    with engine.connect() as conn:
+        sql_query = pd.read_sql(
+            sql=query,
+            con=conn.connection
+        )
+    work_status_df = pd.DataFrame(sql_query)
+
+    # 3. Format queried data
+
+    # Rename the columns
+    work_status_df.columns= ['Name', 'Start_time',  'End_time', 'Working Flag', 'Remaining_hours_left']
+
+    # Fix time datatypes
+    work_status_df['Start_time'] = pd.to_datetime(work_status_df['Start_time'], format='%H:%M:%S').dt.time
+    work_status_df['End_time'] = pd.to_datetime(work_status_df['End_time'], format='%H:%M:%S').dt.time
+
+    return work_status_df
+
+@task()
+def fetch_emp_requirements_transformed_from_RDS():
+
+    # 1. Create database connection
+    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    engine = create_engine(db_url)
+
+    # 2. Query data from DB
+    query= 'SELECT * FROM transformed.emp_req;'
+    with engine.connect() as conn:
+        sql_query = pd.read_sql(
+            sql=query,
+            con=conn.connection
+        )
+    emp_requirements = pd.DataFrame(sql_query)
+
+    # 3. Format queried data
+    
+    # Rename the columns
+    emp_requirements.columns= ['From_Time', 'To_Time',  'Reg_Up_Needed', 'Reg_Down_Needed', 'Greeter_Up_Needed', 'Greeter_Down_Needed', 'Min_Total_Emp_Needed', 'Total_Avl_Emp', 'Availability_Check_Flag']
+
+    # Fix time datatypes
+    emp_requirements['From_Time'] = pd.to_datetime(emp_requirements['From_Time'], format='%H:%M:%S').dt.time
+    emp_requirements['To_Time'] = pd.to_datetime(emp_requirements['To_Time'], format='%H:%M:%S').dt.time
+
+    return emp_requirements
+
+@task()
+def greeter_allocation(work_status_df, emp_requirements):
+    greeter_assignment, greeter_shift_done_dict = allocate_greeter(work_status_df, emp_requirements)
+    return greeter_assignment
+
+@task()
+def register_salesfloor_allocation(emp_requirements, work_status_df, greeter_assignment):
+    register_allocation= allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assignment)
+    final_allocation= pd.merge(greeter_assignment, register_allocation, how='outer', left_on=['From_Time', 'To_Time'], right_on=['From_Time', 'To_Time'])
+    return final_allocation
+
+@task()
+def store_final_allocation_in_rds(final_allocation):
+    
+    print("INPUT DATA.")
+    print("Data:")
+    print(final_allocation.head())
+    print("Data Info:")
+    print(final_allocation.info())
+
+    # 1. Format datatype, replace nulls to empty string and convert the dataframe into list of tuple
+    # Format time to string
+    final_allocation["From_Time"] = final_allocation["From_Time"].astype(str)
+    final_allocation["To_Time"] = final_allocation["To_Time"].astype(str)
+
+    # Format nulls
+    final_allocation['Upstairs Greeter']= final_allocation['Upstairs Greeter'].fillna('')
+    final_allocation['Downstairs Greeter']= final_allocation['Downstairs Greeter'].fillna('')
+    final_allocation['Register Up']= final_allocation['Register Up'].fillna('')
+    final_allocation['Register Down']= final_allocation['Register Down'].fillna('')
+    final_allocation['SF Up']= final_allocation['SF Up'].fillna('')
+    final_allocation['SF Down']= final_allocation['SF Down'].fillna('')
+
+    # Format name array to string
+    def array_to_str(arr):
+        if isinstance(arr, str) and arr == '':
+            return arr
+        result=''
+        for i in arr:
+            result+=str(i)+", "
+        return result[:-2]
+    
+    final_allocation["Upstairs Greeter"] = final_allocation["Upstairs Greeter"].astype(str)
+    final_allocation["Downstairs Greeter"] = final_allocation["Downstairs Greeter"].astype(str)
+    final_allocation["Register Up"] = final_allocation["Register Up"].apply(array_to_str)
+    final_allocation["Register Down"] = final_allocation["Register Down"].apply(array_to_str)
+    final_allocation["SF Up"] = final_allocation["SF Up"].apply(array_to_str)
+    final_allocation["SF Down"] = final_allocation["SF Down"].apply(array_to_str)
+
+    insert_values= [] # Will be a list of tuples
+    for index,row in final_allocation.iterrows():
+        insert_values.append(tuple(row.values))
+
+    print("Dataformatted successfully.")
+    print("Data:")
+    print(final_allocation.head())
+    print("Data Info:")
+    print(final_allocation.info())
+
+    # 2. Create database connection
+    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    engine = create_engine(db_url)
+
+    # 3. Truuncate the table and insert new data row by row
+    truncate_query= "TRUNCATE TABLE scheduled.final_allocation; "
+    insert_query= "INSERT INTO scheduled.final_allocation  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    with engine.connect() as conn:
+        conn.execute(truncate_query) 
+        for record in insert_values:
+            conn.execute(insert_query, record)
+    print("Data replaced/inserted successfully.")
 
     return
 
 with DAG(dag_id="Bookstore_Scheduling_DAG", schedule_interval="0 9 * * *", start_date=datetime(2022, 3, 5), catchup=False, tags=["Bookstore"]) as dag:
 
-    with TaskGroup("ETL_Input_Data", tooltip="Extract & transform Employee Availability and Shift Requirement data") as extract_trans_emp_aval:
+    with TaskGroup("Transformation_ETL", tooltip="Extract & transform Employee Availability and Shift Requirement data") as transformation:
         df = fetch_emp_avail_from_s3()
         work_status_df = prepare_emp_aval(df)
         emp_count_req = fetch_shift_req_from_s3()
@@ -183,6 +315,20 @@ with DAG(dag_id="Bookstore_Scheduling_DAG", schedule_interval="0 9 * * *", start
         # Define the task order
         [df, emp_count_req] >> work_status_df >> emp_requirements
         emp_requirements >> [store_work_status_task, store_emp_requirements_task]
+    
+    with TaskGroup("Scheduling", tooltip="Run scheduling algorithm using the transformed data and store results in RDS.") as scheduling:
+        work_status_df_task = fetch_work_status_df_transformed_from_RDS()
+        emp_requirements_task = fetch_emp_requirements_transformed_from_RDS()
 
-    extract_trans_emp_aval
+        # Ensure these functions return the actual task object, not the DataFrame
+        greeter_assignment_task = greeter_allocation(work_status_df_task, emp_requirements_task)
+        final_allocation_task = register_salesfloor_allocation(emp_requirements_task, work_status_df_task, greeter_assignment_task)
+
+        # Define tasks to store scheduling data back in RDS
+        store_final_allocation_rds_task = store_final_allocation_in_rds(final_allocation_task)
+
+        # Define the task order using task objects
+        [work_status_df_task, emp_requirements_task] >> greeter_assignment_task >> final_allocation_task >> store_final_allocation_rds_task
+
+    transformation >> scheduling
 

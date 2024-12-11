@@ -1,4 +1,4 @@
--- Create schema
+-- Create transformed schema
 CREATE SCHEMA transformed;
 
 -- Create table emp_req
@@ -30,3 +30,26 @@ CREATE TABLE transformed.work_status (
 );
 
 select * from transformed.work_status;
+
+
+
+-- Create scheduled schema
+CREATE SCHEMA scheduled;
+
+-- Create table emp_req
+drop table scheduled.final_allocation;
+
+CREATE TABLE scheduled.final_allocation (
+    From_Time VARCHAR(100) NOT NULL,
+    To_Time VARCHAR(100) NOT NULL,
+    Greeter_Down_Needed INT NOT NULL,
+    Greeter_Up_Needed INT NOT NULL,
+    Upstairs_Greeter VARCHAR(255),        -- Can be NULL
+    Downstairs_Greeter VARCHAR(255),      -- Can be NULL
+    Reg_Up_Needed INT NOT NULL,
+    Reg_Down_Needed INT NOT NULL,
+    Register_Up VARCHAR(255),            -- Array of strings
+    Register_Down VARCHAR(255),          -- Array of strings
+    SF_Up VARCHAR(255),                  -- Array of strings
+    SF_Down VARCHAR(255)                 -- Array of strings
+);
