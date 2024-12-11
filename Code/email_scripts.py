@@ -174,6 +174,44 @@ def upload_data_to_dynamodb(records):
 
     return
 
+def delete_all_records_from_dynamodb():
+    # Get AWS credentials from environment variables
+    region = os.getenv('AWS_DEFAULT_REGION', 'ap-south-1')
+    aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+    # Initialize DynamoDB client and table with credentials
+    dynamodb = boto3.resource(
+        'dynamodb',
+        region_name=region,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key
+    )
+    table = dynamodb.Table('ShiftsTable')
+
+    # Extract key attribute names from the key schema
+    key_names = [key['AttributeName'] for key in table.key_schema]
+
+    # Scan the table to retrieve all items
+    response = table.scan()
+    items = response.get('Items', [])
+
+    # Delete each item
+    for item in items:
+        # Construct the key from the item using the key names
+        key = {key_name: item[key_name] for key_name in key_names}
+        table.delete_item(Key=key)
+
+    # Handle pagination if the table has more items than the scan limit
+    while 'LastEvaluatedKey' in response:
+        response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+        items = response.get('Items', [])
+        for item in items:
+            key = {key_name: item[key_name] for key_name in key_names}
+            table.delete_item(Key=key)
+
+    print("All items deleted in Dynamo DB successfully.")
+
 def connect_to_dynamodb():
     dynamodb = boto3.resource(
         'dynamodb',
@@ -246,6 +284,8 @@ def send_data_to_sqs():
             print("Failed to connect to SQS.")
     else:
         print("Failed to connect to DynamoDB.")
+
+    delete_all_records_from_dynamodb()
 
     pass
 
@@ -322,7 +362,5 @@ def process_sqs_messages():
     else:
         print("Failed to connect to SQS.")
     return
-
-
 
 
