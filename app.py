@@ -15,7 +15,7 @@ AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 # Database connection
-DB_URL = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+DB_URL = "enter your connection DB URL"
 engine = create_engine(DB_URL)
 print("RDS DATABSE ENGINE CONNECTED")
 
