@@ -46,7 +46,7 @@ def covert_rds_to_json():
     dynamo_db_input=dict()
 
     email_lookup={
-        'Carson Turk': 'saaijeesh23@gmail.com'
+        'Saaijeesh Naresh': 'saaijeesh23@gmail.com'
     }
 
     def check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name):
@@ -364,3 +364,7 @@ def process_sqs_messages():
     return
 
 
+# records= covert_rds_to_json()
+# upload_data_to_dynamodb(records)
+# send_data_to_sqs()
+process_sqs_messages()
