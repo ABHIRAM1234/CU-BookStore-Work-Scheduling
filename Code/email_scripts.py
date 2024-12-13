@@ -12,7 +12,7 @@ load_dotenv()
 
 def covert_rds_to_json():
     # 1. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
     print("RDS Database Connection Successfull")
 
@@ -229,7 +229,7 @@ def connect_to_sqs():
                 aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
                 aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'))
 
-        queue_url = 'https://sqs.ap-south-1.amazonaws.com/339713126144/schedule_email_sqs.fifo'
+        queue_url = 'enter your connection url'
         return sqs, queue_url
     except Exception as e:
         print(f"Error connecting to SQS: {e}")
@@ -313,7 +313,7 @@ def process_sqs_messages():
             
             # Send email via SES
             ses.send_email(
-                Source='saaijeesh23@gmail.com',  
+                Source='source email id',  
                 Destination={'ToAddresses': [email]},
                 Message={
                     'Subject': {'Data': 'Your Shift Details'},
