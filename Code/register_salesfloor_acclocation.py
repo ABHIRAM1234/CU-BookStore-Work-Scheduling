@@ -39,13 +39,16 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
 
         # Working Employees
         all_working_emp_list= work_status_df[(work_status_df['Start_time']== curr_time) & (work_status_df['End_time']== curr_time_plus30)]['Name'].to_list()
-
+        print("Total # Emp Working:", len(all_working_emp_list))
+        print("Total Emp Working:", all_working_emp_list)
+        
         # Greeters allocated already for the current shift
         greeter_filtered= greeter_assignment[(greeter_assignment['From_Time']== curr_time) & (greeter_assignment['To_Time']== curr_time_plus30)]
         greeter_emp_list= [greeter_filtered['Upstairs Greeter'].values[0],greeter_filtered['Downstairs Greeter'].values[0]]
         if None in greeter_emp_list:
             greeter_emp_list.remove(None)
-        greeter_emp_list
+        print("Greeters Count:", len(greeter_emp_list))    
+        print("Current Greeters:", greeter_emp_list)
 
         # Baseed on the workring and greeter list, calculate the retined register list
         retained_RUs=[]
@@ -78,25 +81,27 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
         new_RD_needed_count= needed_RD_count-RD_retained_count
 
         # Create the priority table. Use the same table to assign both RU and RD
-        priority_table= work_status_df[(work_status_df['Start_time']== curr_time) & (work_status_df['End_time']== curr_time_plus30) & (work_status_df['Name'] not in retained_RUs+retained_RDs)]
+        priority_table= work_status_df[(work_status_df['Start_time']== curr_time) & (work_status_df['End_time']== curr_time_plus30) & (~work_status_df['Name'].isin(retained_RUs + retained_RDs + greeter_emp_list))]    #(work_status_df['Name'] not in retained_RUs+retained_RDs+greeter_emp_list)]
         priority_table['RU_Priority'] = priority_table['Remaining_hours_left'].rank(method='min', ascending=False).astype(int)
         priority_table.sort_values(by='RU_Priority', inplace=True)
         priority_table.reset_index(drop=True, inplace=True)
 
         # Pick the new registers for both RU and RD
         print('RU_retained_count', RU_retained_count)
-        print('RD_retained_count', new_RU_needed_count)
+        print('RD_retained_count', RD_retained_count)
+        print('retained_RUs', retained_RUs)
+        print('retained_RDs', retained_RDs)
         print('new_RU_needed_count', new_RU_needed_count)
         print('new_RD_needed_count', new_RD_needed_count)
         new_RU_assigned= priority_table['Name'][:new_RU_needed_count].tolist()
         new_RD_assigned= priority_table['Name'][new_RU_needed_count: new_RU_needed_count+new_RD_needed_count].tolist()
-        print('retained_RUs', retained_RUs)
-        print('retained_RDs', retained_RDs)
         print('new_RU_assigned', new_RU_assigned)
         print('new_RD_assigned', new_RD_assigned)
 
         # Assign the remaining to salesfloor
-        unassigned_count= len(priority_table)-(new_RU_needed_count+new_RD_needed_count)
+        unassigned_count= len(all_working_emp_list)- len(greeter_emp_list)- RU_retained_count- RD_retained_count- len(new_RU_assigned)- len(new_RD_assigned)
+        print("unassigned_count", unassigned_count)
+        #unassigned_count= len(priority_table)-(new_RU_needed_count+new_RD_needed_count)
         if(unassigned_count<=0):
             salesfloor_up_assigned_count=0
             salesfloor_up_assigned= []
@@ -104,7 +109,7 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
             salesfloor_dwn_assigned= []
         elif(unassigned_count==1):
             salesfloor_up_assigned_count=1
-            salesfloor_up_assigned= priority_table['Name'][-1].tolist()
+            salesfloor_up_assigned= priority_table['Name'].tolist()[-1]
             salesfloor_dwn_assigned_count=0
             salesfloor_dwn_assigned= []
         else:
@@ -112,7 +117,6 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
             salesfloor_up_assigned= priority_table['Name'][new_RU_needed_count+new_RD_needed_count:new_RU_needed_count+new_RD_needed_count+salesfloor_up_assigned_count].tolist()
             salesfloor_dwn_assigned_count=unassigned_count-salesfloor_up_assigned_count
             salesfloor_dwn_assigned= priority_table['Name'][new_RU_needed_count+new_RD_needed_count+salesfloor_up_assigned_count:].tolist()
-        print('unassigned_count', unassigned_count)
         print('salesfloor_up_assigned_count', salesfloor_up_assigned_count)
         print('salesfloor_up_assigned', salesfloor_up_assigned)
         print('salesfloor_dwn_assigned_count', salesfloor_dwn_assigned_count)
@@ -130,8 +134,9 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
                 # Assign new SF down employees
                 register_allocation.at[i, 'SF Down'] = salesfloor_dwn_assigned
         
-        # Should not break this, rather increment the start time by 30mins so that the while loop continues
-        #break
+        # Updates few variables for the next iteration
         curr_time= curr_time_plus30
+        current_RUs= retained_RUs+ new_RU_assigned
+        current_RDs= retained_RDs+ new_RD_assigned
 
     return register_allocation
