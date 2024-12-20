@@ -7,7 +7,7 @@ This repository contains the code and instructions to automate the employee sche
 
 Find out more:
 * [YouTube](https://www.youtube.com/watch?v=VsPd99rmNYg)
-* Website
+* [Website](https://www.niranjancholendiran.com/works/buff-rostoreing)
 
 ## Setup Instructions
 
