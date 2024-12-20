@@ -118,7 +118,7 @@ def store_work_status_in_rds(work_status_df):
     print(work_status_df.info())
 
     # 2. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
     print("Database connection successfully.")
 
@@ -156,7 +156,7 @@ def store_emp_requirements_in_rds(emp_requirements):
     print(emp_requirements.info())
 
     # 2. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
     print("Database connection successfully.")
 
@@ -176,7 +176,7 @@ def store_emp_requirements_in_rds(emp_requirements):
 def fetch_work_status_df_transformed_from_RDS():
     
     # 1. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
 
     # 2. Query data from DB
@@ -203,7 +203,7 @@ def fetch_work_status_df_transformed_from_RDS():
 def fetch_emp_requirements_transformed_from_RDS():
 
     # 1. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
 
     # 2. Query data from DB
@@ -286,7 +286,7 @@ def store_final_allocation_in_rds(final_allocation):
     print(final_allocation.info())
 
     # 2. Create database connection
-    db_url = "postgresql://saaijeesh_rds:SAAI18max@dcsc-scheduling-db.cr6saecsqga3.ap-south-1.rds.amazonaws.com:5432/postgres"
+    db_url = "enter your connection url"
     engine = create_engine(db_url)
 
     # 3. Truuncate the table and insert new data row by row
