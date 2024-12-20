@@ -1,4 +1,4 @@
-# BuffRoSTOREing
+# BUFF-RoSTOREing
 
 ![Architecture](./02_Documentation/Architecture.png)
 
