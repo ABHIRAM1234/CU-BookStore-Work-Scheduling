@@ -19,6 +19,8 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
     # Prepare intial variables
     current_RUs= []
     current_RDs= []
+    current_SFUs= []
+    current_SFDs=[]
     store_open_time= shift_req_df['From_Time'].min() #time(9, 00) 
     store_close_time= shift_req_df['From_Time'].max()
     time_delta= timedelta(minutes=30)
@@ -45,7 +47,7 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
         # Greeters allocated already for the current shift
         greeter_filtered= greeter_assignment[(greeter_assignment['From_Time']== curr_time) & (greeter_assignment['To_Time']== curr_time_plus30)]
         greeter_emp_list= [greeter_filtered['Upstairs Greeter'].values[0],greeter_filtered['Downstairs Greeter'].values[0]]
-        if None in greeter_emp_list:
+        while None in greeter_emp_list:
             greeter_emp_list.remove(None)
         print("Greeters Count:", len(greeter_emp_list))    
         print("Current Greeters:", greeter_emp_list)
@@ -101,25 +103,44 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
         # Assign the remaining to salesfloor
         unassigned_count= len(all_working_emp_list)- len(greeter_emp_list)- RU_retained_count- RD_retained_count- len(new_RU_assigned)- len(new_RD_assigned)
         print("unassigned_count", unassigned_count)
-        #unassigned_count= len(priority_table)-(new_RU_needed_count+new_RD_needed_count)
+        
+
+            # Retrive the current Salesfloors to allocate them to same up/down place
+        salesfloor_up_assigned=[]
+        salesfloor_dwn_assigned=[]
+        max_salesfloor_up_assigned_count= int(unassigned_count/2)
+        max_salesfloor_dwn_assigned_count= unassigned_count-max_salesfloor_up_assigned_count
+        salesfloor_up_assigned_count=0
+        salesfloor_dwn_assigned_count=0
+        
+
         if(unassigned_count<=0):
             salesfloor_up_assigned_count=0
             salesfloor_up_assigned= []
             salesfloor_dwn_assigned_count=0
             salesfloor_dwn_assigned= []
-        elif(unassigned_count==1):
-            salesfloor_up_assigned_count=1
-            salesfloor_up_assigned= priority_table['Name'].tolist()[-1]
-            salesfloor_dwn_assigned_count=0
-            salesfloor_dwn_assigned= []
         else:
-            salesfloor_up_assigned_count=int(unassigned_count/2)
-            salesfloor_up_assigned= priority_table['Name'][new_RU_needed_count+new_RD_needed_count:new_RU_needed_count+new_RD_needed_count+salesfloor_up_assigned_count].tolist()
-            salesfloor_dwn_assigned_count=unassigned_count-salesfloor_up_assigned_count
-            salesfloor_dwn_assigned= priority_table['Name'][new_RU_needed_count+new_RD_needed_count+salesfloor_up_assigned_count:].tolist()
-        print('salesfloor_up_assigned_count', salesfloor_up_assigned_count)
+            unassigned_emp_list=priority_table['Name'].tolist()[len(priority_table)-unassigned_count:]
+                # If someone from the unassigned emp list was in SF Up in the last shift, let him/her be in the same SF Up until the max count is not exceeded
+            remaining_unassigned_emp_list=[]
+            for unassigned_emp in unassigned_emp_list:
+                # If in SF Up in the last shift and SF Up space left for current shift
+                if((unassigned_emp in current_SFUs) and (salesfloor_up_assigned_count<= max_salesfloor_up_assigned_count)):
+                    salesfloor_up_assigned.append(unassigned_emp)
+                    salesfloor_up_assigned_count+=1
+                # If in SF Down in the last shift and SF Down space left for current shift
+                elif((unassigned_emp in current_SFDs) and (salesfloor_dwn_assigned_count<= max_salesfloor_dwn_assigned_count)):
+                    salesfloor_dwn_assigned.append(unassigned_emp)
+                    salesfloor_dwn_assigned_count+=1
+                else:
+                    remaining_unassigned_emp_list.append(unassigned_emp)
+
+            salesfloor_up_assigned= salesfloor_up_assigned+remaining_unassigned_emp_list[:max_salesfloor_up_assigned_count-salesfloor_up_assigned_count]
+            salesfloor_dwn_assigned= salesfloor_dwn_assigned+remaining_unassigned_emp_list[max_salesfloor_up_assigned_count-salesfloor_up_assigned_count:]
+
+        print('salesfloor_up_assigned_count', max_salesfloor_up_assigned_count)
         print('salesfloor_up_assigned', salesfloor_up_assigned)
-        print('salesfloor_dwn_assigned_count', salesfloor_dwn_assigned_count)
+        print('salesfloor_dwn_assigned_count', max_salesfloor_dwn_assigned_count)
         print('salesfloor_dwn_assigned', salesfloor_dwn_assigned)
         
         # Update the registers in the final table
@@ -138,5 +159,7 @@ def allocate_register_salesfloor(emp_requirements, work_status_df, greeter_assig
         curr_time= curr_time_plus30
         current_RUs= retained_RUs+ new_RU_assigned
         current_RDs= retained_RDs+ new_RD_assigned
+        current_SFUs= salesfloor_up_assigned
+        current_SFDs= salesfloor_dwn_assigned
 
     return register_allocation

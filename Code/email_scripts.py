@@ -149,6 +149,132 @@ def covert_rds_to_json():
 
     return dynamo_db_input_records
 
+
+def convert_df_to_emp_view(df):
+    # 1. Format by time and sort ascending
+
+    # Step 1: Convert to datetime objects
+    df["From_Time"] = pd.to_datetime(df["From_Time"], format="%H:%M:%S")
+    df["To_Time"] = pd.to_datetime(df["To_Time"], format="%H:%M:%S")
+
+    # Step 2: Sort by `From_Time` in ascending order
+    df = df.sort_values(by="From_Time")
+
+    # Step 3: Convert to AM/PM format
+    def convert_time_format(time_obj):
+        return time_obj.strftime("%I:%M%p").lstrip("0")  # Remove leading 0 for hours
+    df["From_Time"] = df["From_Time"].apply(convert_time_format)
+    df["To_Time"] = df["To_Time"].apply(convert_time_format)
+    print("Data sorting and formating Successfull")
+
+    # 4. Convert to dictionary
+    dynamo_db_input=dict()
+
+    email_lookup={
+        'Saaijeesh Naresh': 'saaijeesh23@gmail.com'
+    }
+
+    def check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name):
+        if (emp_name not in dynamo_db_input): # Add name to dictionary if not exist and create template
+            dynamo_db_input[emp_name]= {
+                "Name": emp_name,
+                "Data": [],
+            }
+            return dynamo_db_input
+        else:
+            return dynamo_db_input
+
+    for index,row in df.iterrows():
+        # Convert Greeter Up
+        if row['upstairs_greeter'] !='': 
+            emp_name= row['upstairs_greeter']
+            dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+            # Data row to append
+            data_row={
+                'Location': 'Greeter Upstair',
+                'TimeIn': row['from_time'],
+                'TimeOut': row['to_time']
+                }
+            dynamo_db_input[emp_name]['Data'].append(data_row)
+
+        # Convert Greeter Down
+        if row['downstairs_greeter'] !='': 
+            emp_name= row['downstairs_greeter']
+            dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+            # Data row to append
+            data_row={
+                'Location': 'Greeter Downstair',
+                'TimeIn': row['from_time'],
+                'TimeOut': row['to_time']
+                }
+            dynamo_db_input[emp_name]['Data'].append(data_row)
+
+        # Convert Register Up
+        if row['register_up'] !='': 
+            emp_names= row['register_up'].split(", ")
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Register Upstair',
+                    'TimeIn': row['from_time'],
+                    'TimeOut': row['to_time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        # Convert Register Down
+        if row['register_down'] !='': 
+            emp_names= row['register_down'].split(", ")
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Register Downstair',
+                    'TimeIn': row['from_time'],
+                    'TimeOut': row['to_time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        # Convert Salesfloor Up
+        if row['sf_up'] !='': 
+            emp_names= row['sf_up'].split(", ")
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Salesfloor Upstair',
+                    'TimeIn': row['from_time'],
+                    'TimeOut': row['to_time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        if row['sf_down'] !='': 
+            emp_names= row['sf_down'].split(", ")
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Salesfloor Downstair',
+                    'TimeIn': row['from_time'],
+                    'TimeOut': row['to_time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+    # Remove names as keys and convert to a list of dictionaries
+    dynamo_db_input_records= []
+
+    for key,value in dynamo_db_input.items():
+        dynamo_db_input_records.append(value)
+
+    print("Data Conversion Successfull V1 \n\n")
+    print(dynamo_db_input)
+
+    print("Data Conversion Successfull V2 \n\n")
+    print(dynamo_db_input_records)
+
+    return dynamo_db_input_records
+
+
 def upload_data_to_dynamodb(records):
 
     # Get AWS credentials from environment variables

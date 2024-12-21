@@ -186,10 +186,156 @@ def alert_employee_shortage(work_status_df, emp_count_req):
         if(len(shortage)==0):
             print("No shortage of employees for the whole day")
         else:
-            print("ALERT: Employees are on shortage for the following time slots")
-            print(shortage[['From_Time', 'To_Time', 'Min_Total_Emp_Needed', 'Total_Avl_Emp']])
+            error_message = (
+            "ALERT: Employees are on shortage for the following time slots:\n" +
+            shortage[['From_Time', 'To_Time', 'Min_Total_Emp_Needed', 'Total_Avl_Emp']].to_string(index=False)
+            )
+            raise RuntimeError(error_message)
         return
 
     emp_demand_check['Availability_Check_Flag']= emp_demand_check['Min_Total_Emp_Needed']<= emp_demand_check['Total_Avl_Emp']
     alert_insufficient_emp(emp_demand_check)
     return emp_demand_check
+
+
+def convert_df_to_emp_view(df):
+    # 1. Format by time and sort ascending
+
+    # Step 1: Convert to datetime objects
+    df["From_Time"] = pd.to_datetime(df["From_Time"], format="%H:%M:%S")
+    df["To_Time"] = pd.to_datetime(df["To_Time"], format="%H:%M:%S")
+
+    # Step 2: Sort by `From_Time` in ascending order
+    df = df.sort_values(by="From_Time")
+
+    # Step 3: Convert to AM/PM format
+    def convert_time_format(time_obj):
+        return time_obj.strftime("%I:%M%p").lstrip("0")  # Remove leading 0 for hours
+    df["From_Time"] = df["From_Time"].apply(convert_time_format)
+    df["To_Time"] = df["To_Time"].apply(convert_time_format)
+    print("Data sorting and formating Successfull")
+
+    # 4. Convert to dictionary
+    dynamo_db_input=dict()
+
+    def check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name):
+        if (emp_name not in dynamo_db_input): # Add name to dictionary if not exist and create template
+            dynamo_db_input[emp_name]= {
+                "Name": emp_name,
+                "Data": [],
+            }
+            return dynamo_db_input
+        else:
+            return dynamo_db_input
+
+    for index,row in df.iterrows():
+        # Convert Greeter Up
+        if row['Upstairs Greeter'] !='' and row['Upstairs Greeter'] !=None: 
+            emp_name= row['Upstairs Greeter']
+            dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+            # Data row to append
+            data_row={
+                'Location': 'Greeter Upstair',
+                'TimeIn': row['From_Time'],
+                'TimeOut': row['To_Time']
+                }
+            dynamo_db_input[emp_name]['Data'].append(data_row)
+
+        # Convert Greeter Down
+        if row['Downstairs Greeter'] !='' and row['Downstairs Greeter'] !=None: 
+            emp_name= row['Downstairs Greeter']
+            dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+            # Data row to append
+            data_row={
+                'Location': 'Greeter Downstair',
+                'TimeIn': row['From_Time'],
+                'TimeOut': row['To_Time']
+                }
+            dynamo_db_input[emp_name]['Data'].append(data_row)
+
+        # Convert Register Up
+        if row['Register Up'] !='' and row['Register Up'] !=None: 
+            emp_names= row['Register Up']
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Register Upstair',
+                    'TimeIn': row['From_Time'],
+                    'TimeOut': row['To_Time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        # Convert Register Down
+        if row['Register Down'] !='' and row['Register Down'] !=None: 
+            emp_names= row['Register Down']
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Register Downstair',
+                    'TimeIn': row['From_Time'],
+                    'TimeOut': row['To_Time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        # Convert Salesfloor Up
+        if row['SF Up'] !='' and row['SF Up'] !=None: 
+            emp_names= row['SF Up']
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Salesfloor Upstair',
+                    'TimeIn': row['From_Time'],
+                    'TimeOut': row['To_Time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+        if row['SF Down'] !='' and row['SF Down'] !=None: 
+            emp_names= row['SF Down']
+            for emp_name in emp_names:
+                dynamo_db_input= check_and_assign_new_name_dynamo_dict(dynamo_db_input,emp_name)
+                # Data row to append
+                data_row={
+                    'Location': 'Salesfloor Downstair',
+                    'TimeIn': row['From_Time'],
+                    'TimeOut': row['To_Time']
+                    }
+                dynamo_db_input[emp_name]['Data'].append(data_row)
+        
+    # Remove names as keys and convert to a list of dictionaries
+    dynamo_db_input_records= []
+
+    for key,value in dynamo_db_input.items():
+        dynamo_db_input_records.append(value)
+
+    # Convert to a DataFrame
+    rows = []
+    for entry in dynamo_db_input_records:
+        name = entry['Name']
+        for record in entry['Data']:
+            rows.append({'Name': name, **record})
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values(by=['Name','TimeIn'], ascending=[True,True])
+
+    # Merge consecutive time intervals for the same employee and location
+    merged_rows = []
+    for name, group in df.groupby("Name"):
+        group = group.sort_values("TimeIn")  # Ensure sorted by TimeIn
+        temp_row = group.iloc[0].to_dict()  # Start with the first row
+        for _, row in group.iloc[1:].iterrows():
+            if row["Location"] == temp_row["Location"] and row["TimeIn"] == temp_row["TimeOut"]:
+                temp_row["TimeOut"] = row["TimeOut"]  # Extend the time interval
+            else:
+                merged_rows.append(temp_row)  # Save the previous row
+                temp_row = row.to_dict()  # Start a new row
+        merged_rows.append(temp_row)  # Append the last row
+
+    # Create the merged DataFrame
+    merged_df = pd.DataFrame(merged_rows)
+
+    return merged_df
+
+
