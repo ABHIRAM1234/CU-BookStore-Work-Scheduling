@@ -5,10 +5,6 @@
 
 This repository contains the code and instructions to automate the employee scheduling system for CU Bookstore. The system is designed to streamline the scheduling process by collecting employee availability and shift requirements, then using AWS services, Python scripts, and Flask to generate and notify employees of their assigned shifts.
 
-Find out more:
-* [YouTube](https://www.youtube.com/watch?v=VsPd99rmNYg)
-* [Website](https://www.niranjancholendiran.com/works/buff-rostoreing)
-
 ## Setup Instructions
 
 Follow these steps to set up and run the project locally and connect to AWS services.
