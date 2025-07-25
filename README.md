@@ -22,7 +22,7 @@ ssh -i "your-key.pem" ec2-user@<EC2_PUBLIC_IP>
 Once connected to your EC2 instance, clone the repository to your local machine by running the following command:
 
 ```bash
-git clone https://github.com/Niranjan-Cholendiran/CU-BookStore-Work-Scheduling.git
+git clone https://github.com/ABHIRAM1234/CU-BookStore-Work-Scheduling.git
 ```
 
 ### 3. Create and Activate a Virtual Environment
